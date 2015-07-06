@@ -1,0 +1,85 @@
+<div class="widget-measure widget-measure-main">
+  <span class='widget-label'>Children Components</span>
+  <ul id="views">
+  </ul>
+</div>
+<script>
+/* globals $j*/
+var url = window.location.protocol + '//' + window.location.host + '/';
+var api = url + 'api';
+
+(function () {
+
+  'use strict';
+  $j(document).ready(function () {
+
+    function getCurrentIndex() {
+      var index = window.location.pathname.split("/")[3];
+      if(index === undefined){
+        return getUrlParam('id');
+      } else {
+        return index;
+      }
+    }
+
+    function getDashIndex() {
+      var did = getUrlParam('did');
+      if(did){
+        return "?did=" + did;
+      } else {
+        return '';
+      }
+    }
+
+    function getUrlParam(name) {
+      var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+      if (results==null){
+        return null;
+      }
+      else{
+        return results[1] || 0;
+      }
+    }
+
+    $j.get(api + '/resources/index?depth=1&qualifiers=SVW,TRK,BRC,UTS,DIR,FIL,DEV&resource=' + getCurrentIndex())
+    .success(function(resourceResponse) {
+      if(resourceResponse.length === 0){
+        $j('#views').append('<li style="margin:5px">No Children</li>');
+      } else {
+        $j.each(resourceResponse, function (index, resource) {
+          // we found that children of subviews are strange copies of the actual children
+          // if scope is 'fil' and not 'prj', we know that we need to replace the reference
+          if(resource.scope === 'FIL' && resource.qualifier === 'TRK'){
+            // get all the views so we can check if their keys are at the beginning of our resource's key
+            $j.get(api + '/resources/index?qualifiers=VW')
+            .success(function(viewsResponse) {
+              // sort by length so we avoid issues of similar bust smaller key values being found first
+              viewsResponse.sort(function(a, b){
+                return b.length - a.length;
+              });
+              // variable set so we can stop the loop early if a view key is found
+              var stripped = false;
+              // for each view, check to see if it's at the beginning of our resource key
+              $j.each(viewsResponse, function (index, view) {
+                if(stripped) return;
+                if(resource.key.indexOf(view.key) === 0){
+                  // strip the resource key of its view key
+                  $j('#views').append('<li style="margin:5px"><img style="position:absolute" src="' + url + 'images/q/' + resource.qualifier + '.png" alt="' + resource.qualifier + '"> <a style="margin-left:20px" href="' + url + 'dashboard/index/' + resource.key.substring(view.key.length,resource.key.length) + getDashIndex() + '">' + resource.name + '</a></li>');
+                  stripped = true;
+                }
+              });
+              // if for some reason nothing was stripped and our logic was wrong, provide the default link
+              if(!stripped){
+                $j('#views').append('<li style="margin:5px"><img style="position:absolute" src="' + url + 'images/q/' + resource.qualifier + '.png" alt="' + resource.qualifier + '"> <a style="margin-left:20px" href="' + url + 'dashboard/index/' + resource.id + getDashIndex() + '">' + resource.name + '</a></li>');
+              }
+            });
+          }
+          else {
+            $j('#views').append('<li style="margin:5px"><img style="position:absolute" src="' + url + 'images/q/' + resource.qualifier + '.png" alt="' + resource.qualifier + '"> <a style="margin-left:20px" href="' + url + 'dashboard/index/' + resource.id + getDashIndex() + '">' + resource.name + '</a></li>');
+          }
+        });
+      }
+    });
+  });
+})();
+</script>
